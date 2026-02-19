@@ -59,6 +59,11 @@ func Run(ctx context.Context, out *Printer, cfg Config, rt runtime.Runtime, sess
 	// will be non-zero if the agent failed.
 	var lastErr error
 
+	// autoExtensions tracks how many times the user has extended past max iterations.
+	// Declared at Run() level so the cap applies to the entire session, not per message.
+	const maxAutoExtensions = 5
+	autoExtensions := 0
+
 	oneLoop := func(text string, rd io.Reader) error {
 		userInput := strings.TrimSpace(text)
 		if userInput == "" {
@@ -153,9 +158,15 @@ func Run(ctx context.Context, out *Printer, cfg Config, rt runtime.Runtime, sess
 					out.PrintError(lastErr)
 				}
 			case *runtime.MaxIterationsReachedEvent:
+				if autoExtensions >= maxAutoExtensions {
+					out.Printf("\n⚠️  Session extension limit (%d) reached. Stopping agent.\n", maxAutoExtensions)
+					rt.Resume(ctx, runtime.ResumeReject(""))
+					return nil
+				}
 				result := out.PromptMaxIterationsContinue(ctx, e.MaxIterations)
 				switch result {
 				case ConfirmationApprove:
+					autoExtensions++
 					rt.Resume(ctx, runtime.ResumeApprove())
 				case ConfirmationReject:
 					rt.Resume(ctx, runtime.ResumeReject(""))
