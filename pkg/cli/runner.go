@@ -40,6 +40,10 @@ type Config struct {
 	OutputJSON     bool
 }
 
+// autoRejectReason is the reason emitted in AutoResolutionEvent when running
+// in non-interactive JSON mode and an automatic rejection is applied.
+const autoRejectReason = "no interactive prompt in JSON mode"
+
 // Run executes an agent in non-TUI mode, handling user input and runtime events.
 // userMessages contains the user messages to send. If a single message is "-",
 // input is read from stdin. If empty, an interactive prompt loop is started.
@@ -69,13 +73,8 @@ func Run(ctx context.Context, out *Printer, cfg Config, rt runtime.Runtime, sess
 
 		if cfg.OutputJSON {
 			for event := range rt.RunStream(ctx, sess) {
-				switch e := event.(type) {
-				case *runtime.ToolCallConfirmationEvent:
-					if !cfg.AutoApprove {
-						rt.Resume(ctx, runtime.ResumeReject(""))
-					}
-				case *runtime.ErrorEvent:
-					return fmt.Errorf("%s", e.Error)
+				if errEvent, ok := event.(*runtime.ErrorEvent); ok {
+					return fmt.Errorf("%s", errEvent.Error)
 				}
 
 				buf, err := json.Marshal(event)
@@ -83,6 +82,19 @@ func Run(ctx context.Context, out *Printer, cfg Config, rt runtime.Runtime, sess
 					return err
 				}
 				out.Println(string(buf))
+
+				switch event.(type) {
+				case *runtime.ToolCallConfirmationEvent:
+					if cfg.AutoApprove {
+						rt.Resume(ctx, runtime.ResumeApprove())
+					} else {
+						printJSON(out, runtime.AutoResolution("reject", autoRejectReason))
+						rt.Resume(ctx, runtime.ResumeReject(""))
+					}
+				case *runtime.MaxIterationsReachedEvent:
+					printJSON(out, runtime.AutoResolution("reject", autoRejectReason))
+					rt.Resume(ctx, runtime.ResumeReject(""))
+				}
 			}
 
 			return nil
@@ -386,4 +398,14 @@ func CreateUserMessageWithAttachment(userContent, attachmentPath string) *sessio
 	}
 
 	return session.UserMessage(textContent, multiContent...)
+}
+
+// printJSON marshals v and prints it as a JSON line. Marshal errors are logged.
+func printJSON(out *Printer, v any) {
+	buf, err := json.Marshal(v)
+	if err != nil {
+		slog.Warn("Failed to marshal event to JSON", "error", err)
+		return
+	}
+	out.Println(string(buf))
 }

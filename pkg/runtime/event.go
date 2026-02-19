@@ -391,6 +391,24 @@ func MaxIterationsReached(maxIterations int) Event {
 	}
 }
 
+// AutoResolutionEvent is emitted in non-interactive modes (e.g. JSON output) to indicate
+// that an automatic decision was made in response to a confirmation request or safety cap,
+// since there is no interactive prompt available.
+type AutoResolutionEvent struct {
+	Type   string `json:"type"`
+	Action string `json:"action"` // "approve" or "reject"
+	Reason string `json:"reason"`
+	AgentContext
+}
+
+func AutoResolution(action, reason string) Event {
+	return &AutoResolutionEvent{
+		Type:   "auto_resolution",
+		Action: action,
+		Reason: reason,
+	}
+}
+
 // MCPInitStartedEvent is for MCP initialization lifecycle events
 type MCPInitStartedEvent struct {
 	Type string `json:"type"`
