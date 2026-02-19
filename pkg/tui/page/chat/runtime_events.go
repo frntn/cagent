@@ -288,6 +288,15 @@ func (p *chatPage) handleToolCallResponse(msg *runtime.ToolCallResponseEvent) te
 
 func (p *chatPage) handleMaxIterationsReached(msg *runtime.MaxIterationsReachedEvent) tea.Cmd {
 	spinnerCmd := p.setWorking(false)
+
+	if p.sessionState.YoloMode() && p.autoExtensions < maxAutoExtensions {
+		p.autoExtensions++
+		return tea.Batch(
+			spinnerCmd,
+			core.CmdHandler(dialog.RuntimeResumeMsg{Request: runtime.ResumeApprove()}),
+		)
+	}
+
 	dialogCmd := core.CmdHandler(dialog.OpenDialogMsg{
 		Model: dialog.NewMaxIterationsDialog(msg.MaxIterations, p.app),
 	})
