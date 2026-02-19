@@ -141,6 +141,10 @@ type queuedMessage struct {
 // maxQueuedMessages is the maximum number of messages that can be queued
 const maxQueuedMessages = 5
 
+// maxAutoExtensions is the maximum number of times max iterations can be
+// auto-continued in YOLO mode within a single session.
+const maxAutoExtensions = 5
+
 // chatPage implements Page
 type chatPage struct {
 	width, height int
@@ -204,6 +208,10 @@ type chatPage struct {
 	sidebarDragStartX     int  // X position when drag started
 	sidebarDragStartWidth int  // Sidebar preferred width when drag started
 	sidebarDragMoved      bool // True if mouse moved beyond threshold during drag
+
+	// autoExtensions tracks how many times max iterations has been auto-continued
+	// in YOLO mode. Enforces the same session-level safety cap as CLI mode.
+	autoExtensions int
 }
 
 // computeSidebarLayout calculates the layout based on current state.

@@ -31,6 +31,11 @@ func (e RuntimeError) Unwrap() error {
 	return e.Err
 }
 
+// maxAutoExtensions is the maximum number of times the agent can automatically
+// continue past max iterations in a single session (applies to YOLO mode and
+// user-confirmed extensions alike).
+const maxAutoExtensions = 5
+
 // Config holds configuration for running an agent in CLI mode
 type Config struct {
 	AppName        string
@@ -61,7 +66,6 @@ func Run(ctx context.Context, out *Printer, cfg Config, rt runtime.Runtime, sess
 
 	// autoExtensions tracks how many times the user has extended past max iterations.
 	// Declared at Run() level so the cap applies to the entire session, not per message.
-	const maxAutoExtensions = 5
 	autoExtensions := 0
 
 	oneLoop := func(text string, rd io.Reader) error {
@@ -162,6 +166,11 @@ func Run(ctx context.Context, out *Printer, cfg Config, rt runtime.Runtime, sess
 					out.Printf("\n⚠️  Session extension limit (%d) reached. Stopping agent.\n", maxAutoExtensions)
 					rt.Resume(ctx, runtime.ResumeReject(""))
 					return nil
+				}
+				if cfg.AutoApprove {
+					autoExtensions++
+					rt.Resume(ctx, runtime.ResumeApprove())
+					continue
 				}
 				result := out.PromptMaxIterationsContinue(ctx, e.MaxIterations)
 				switch result {
