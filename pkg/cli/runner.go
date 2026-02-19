@@ -73,6 +73,8 @@ func Run(ctx context.Context, out *Printer, cfg Config, rt runtime.Runtime, sess
 				case *runtime.ToolCallConfirmationEvent:
 					if !cfg.AutoApprove {
 						rt.Resume(ctx, runtime.ResumeReject(""))
+					} else {
+						rt.Resume(ctx, runtime.ResumeApprove())
 					}
 				case *runtime.ErrorEvent:
 					return fmt.Errorf("%s", e.Error)
